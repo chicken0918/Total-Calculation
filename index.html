@@ -418,6 +418,8 @@
                 const inputs = div.querySelectorAll('input');
                 inputs.forEach(input => {
                     input.draggable = false;
+                    input.addEventListener('focus', () => { div.draggable = false; });
+                    input.addEventListener('blur', () => { div.draggable = true; });
                 });
                 const buttons = div.querySelectorAll('button');
                 buttons.forEach(button => {
@@ -567,3 +569,4 @@
         </script>
     </body>
 </html>
+
