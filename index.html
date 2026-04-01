@@ -87,6 +87,56 @@
             .room-input:focus {
                 border-color: var(--main-color);
             }
+
+            .user-list {
+                position: absolute;
+                right: 20px;
+                top: 50%;
+                transform: translateY(-50%);
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+
+            .user-avatar {
+                width: 40px;
+                height: 40px;
+                border-radius: 20px;
+                border: 2px solid var(--main-color);
+                cursor: pointer;
+                position: relative;
+            }
+
+            .user-avatar:hover .user-tooltip {
+                display: block;
+            }
+
+            .user-tooltip {
+                display: none;
+                position: absolute;
+                top: 50px;
+                right: 0;
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                padding: 10px;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+                z-index: 1001;
+                text-align: center;
+                min-width: 120px;
+            }
+
+            .user-tooltip img {
+                width: 60px;
+                height: 60px;
+                border-radius: 30px;
+                margin-bottom: 5px;
+            }
+
+            .user-tooltip .user-name {
+                font-weight: bold;
+                color: var(--text-dark);
+            }
         </style>
     </head>
     
@@ -127,6 +177,7 @@
             </div>
             <button class="btn btn-sub" onclick="toggleDarkMode()">Dark/White</button>
             <button class="btn btn-sub" onclick="toggleModeSelector()" title="モード変更">モード選択</button>
+            <div id="user-list" class="user-list"></div>
         </div>
 
         <div id="custom-modal-overlay">
@@ -173,7 +224,7 @@
 
             import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
             import { getAuth } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-            import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+            import { getDatabase, ref, set, onValue, onDisconnect, push } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 
             const firebaseConfig = {
                 apiKey: "AIzaSyB28UEf4D7P_HEPTPJ2LFW1qNX6eClSiV8",
@@ -192,6 +243,8 @@
             let isOnlineConnected = false;
             let isRendering = false;
             let saveTimeout;
+            let currentUserId = null;
+            let users = {};
 
             window.debouncedSaveData = function() {
                 clearTimeout(saveTimeout);
@@ -216,7 +269,23 @@
                             roomPwInput.style.borderColor = '';
                             pwError.style.display = 'none';
                             overlay.style.display = 'none';
+                            // ユーザーID生成と登録
+                            if (!currentUserId) {
+                                currentUserId = localStorage.getItem('userId') || push(ref(db, 'rooms/' + roomId + '/users')).key;
+                                localStorage.setItem('userId', currentUserId);
+                                const userName = generateRandomName();
+                                const userAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUserId}`;
+                                const userRef = ref(db, 'rooms/' + roomId + '/users/' + currentUserId);
+                                set(userRef, { name: userName, avatar: userAvatar });
+                                onDisconnect(userRef).remove();
+                            }
                             renderFromOnline(data.content, data.logs);
+                            // ユーザーリスト監視
+                            const usersRef = ref(db, 'rooms/' + roomId + '/users');
+                            onValue(usersRef, (usersSnapshot) => {
+                                users = usersSnapshot.val() || {};
+                                renderUserList();
+                            });
                         } else {
                             roomPwInput.style.borderColor = '#d00';
                             pwError.textContent = 'パスワードが違います';
@@ -226,9 +295,25 @@
                         // 新規作成
                         roomPwInput.style.borderColor = '';
                         pwError.style.display = 'none';
-                        set(roomRef, { password: roomPw, content: [], logs: [] }).then(() => {
+                        set(roomRef, { password: roomPw, content: [], logs: [], users: {} }).then(() => {
                             overlay.style.display = 'none';
+                            // ユーザーID生成と登録
+                            if (!currentUserId) {
+                                currentUserId = localStorage.getItem('userId') || push(ref(db, 'rooms/' + roomId + '/users')).key;
+                                localStorage.setItem('userId', currentUserId);
+                                const userName = generateRandomName();
+                                const userAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUserId}`;
+                                const userRef = ref(db, 'rooms/' + roomId + '/users/' + currentUserId);
+                                set(userRef, { name: userName, avatar: userAvatar });
+                                onDisconnect(userRef).remove();
+                            }
                             renderFromOnline([], []);
+                            // ユーザーリスト監視
+                            const usersRef = ref(db, 'rooms/' + roomId + '/users');
+                            onValue(usersRef, (usersSnapshot) => {
+                                users = usersSnapshot.val() || {};
+                                renderUserList();
+                            });
                         });
                     }
                 });
@@ -240,11 +325,15 @@
                 document.getElementById('mode-selector-overlay').style.display = 'none';
                 if (mode === 'online') {
                     document.getElementById('room-login-overlay').style.display = 'flex';
-                    isOnlineConnected = false; // 入室時にtrue化
+                    isOnlineConnected = false;
                 } else {
                     document.getElementById('room-login-overlay').style.display = 'none';
                     isOnlineConnected = false;
                     loadDataFromLocal();
+                    // オフライン時はユーザーリストをクリア
+                    document.getElementById('user-list').innerHTML = '';
+                    users = {};
+                    currentUserId = null;
                 }
             };
             
@@ -566,6 +655,30 @@
             window.sortRows = function(asc) { const area = document.getElementById("input-area"), rows = Array.from(area.children); rows.sort((a,b) => (parseFloat(a.querySelector(".num-in").value)||0) - (parseFloat(b.querySelector(".num-in").value)||0)); if(!asc) rows.reverse(); rows.forEach(r => area.appendChild(r)); saveData(); }
             window.renumberLabels = function() { document.querySelectorAll(".label-in").forEach((l, i) => { l.value = `No.${i + 1}`; updateRowColor(l.parentElement.querySelector('.row-color-picker')); }); saveData(); }
             window.resetDisplay = function() { document.getElementById("total-result").innerText = "0"; document.getElementById("count-result").innerText = "0"; document.getElementById("min-result").innerText = "-"; document.getElementById("max-result").innerText = "-"; }
+
+            window.generateRandomName = function() {
+                const adjectives = ['Cool', 'Smart', 'Happy', 'Brave', 'Quick', 'Calm', 'Bold', 'Wise', 'Kind', 'Fast'];
+                const nouns = ['Tiger', 'Eagle', 'Wolf', 'Bear', 'Lion', 'Fox', 'Owl', 'Hawk', 'Cat', 'Dog'];
+                return adjectives[Math.floor(Math.random() * adjectives.length)] + ' ' + nouns[Math.floor(Math.random() * nouns.length)];
+            }
+
+            window.renderUserList = function() {
+                const userList = document.getElementById('user-list');
+                userList.innerHTML = '';
+                Object.keys(users).forEach(userId => {
+                    const user = users[userId];
+                    const avatarDiv = document.createElement('div');
+                    avatarDiv.className = 'user-avatar';
+                    avatarDiv.innerHTML = `
+                        <img src="${user.avatar}" alt="${user.name}" style="width:100%; height:100%; border-radius:50%;">
+                        <div class="user-tooltip">
+                            <img src="${user.avatar}" alt="${user.name}">
+                            <div class="user-name">${user.name}</div>
+                        </div>
+                    `;
+                    userList.appendChild(avatarDiv);
+                });
+            }
         </script>
     </body>
 </html>
