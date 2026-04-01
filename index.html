@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <title>total calculation</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta charset="UTF-8">
+        <style>
+            :root { --main-color: #7fff00; --bg-color: #f8f9fa; --card-bg: #ffffff; --text-dark: #333; --border-color: #ddd; }
+            body.dark-mode { --bg-color: #1a1a1a; --card-bg: #2d2d2d; --text-dark: #eee; --border-color: #444; }
+            
+            body { font-family: sans-serif; background-color: var(--bg-color); color: var(--text-dark); margin: 0; padding: 100px 0 250px; display: flex; flex-direction: column; align-items: center; transition: 0.3s; }
+            .page-title { position: fixed; top: 0; width: 100%; background: var(--card-bg); padding: 15px 0; z-index: 1000; border-bottom: 4px solid var(--main-color); display: flex; justify-content: center; align-items: center; gap: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .main-content { width: 95%; max-width: 750px; }
+            .input-card { background: var(--card-bg); padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+
+            .input-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; padding: 10px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); cursor: grab; }
+            .row-color-picker { width: 28px; height: 28px; border: none; padding: 0; background: none; cursor: pointer; border-radius: 50%; }
+            .input-row input { padding: 10px; border-radius: 8px; border: 2px solid var(--border-color); background: var(--card-bg); color: var(--text-dark); outline: none; }
+            .label-in { width: 70px; font-size: 13px; text-align: center; font-weight: bold; border: none !important; }
+            .num-in { flex: 2; font-weight: bold; font-size: 18px; min-width: 0; }
+            .memo-in { flex: 3; font-size: 14px; min-width: 0; }
+            
+            .row-btn { border: none; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+            .btn-copy { background: #e0f0ff; color: #007bff; }
+            .btn-del { background: #ffaaaa; color: #900; }
+
+            .log-card { background: var(--card-bg); padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-top: 20px; }
+            .log-item-container { border-bottom: 1px solid var(--border-color); position: relative; padding: 15px 0 10px 0; cursor: grab; background: var(--card-bg); }
+            .log-entry-title { border:none; background:transparent; font-weight:bold; font-size:16px; text-align:center; width:100%; color:var(--text-dark); outline:none; margin-bottom: 8px; display: block; }
+            .log-summary { padding: 5px 40px 5px 10px; cursor: pointer; display: flex; justify-content: space-between; font-size: 13px; user-select: none; }
+            .log-details { display: none; padding: 10px; background: rgba(0,0,0,0.03); font-size: 12px; border-radius: 8px; margin-top: 5px; }
+            .log-details.show { display: block; }
+
+            .log-controls { position: absolute; right: 5px; top: 12px; display: flex; gap: 5px; z-index: 10; }
+            .log-btn { border: none; border-radius: 4px; cursor: pointer; padding: 2px 8px; font-size: 12px; }
+            .log-load-btn { background: #e0ffeb; color: #008833; }
+            .log-del-btn { background: #ffaaaa; color: #900; }
+
+            .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 750px; background: var(--card-bg); padding: 20px; border-top: 1px solid var(--border-color); z-index: 1000; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; }
+            .btn-group { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 5px; }
+            .btn { border: none; border-radius: 8px; cursor: pointer; font-weight: bold; padding: 10px 15px; }
+            .btn-main { background: var(--main-color); color: #000; padding: 15px 60px; font-size: 20px; }
+            .btn-sub { background: #eee; color: #333; }
+            .result-bar b { color: var(--main-color); font-size: 26px; filter: brightness(0.8); }
+
+            #custom-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+            #custom-modal { background: var(--card-bg); padding: 30px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.3); transform: scale(0.8); transition: 0.2s; border-top: 10px solid var(--main-color); }
+            #custom-modal.open { transform: scale(1); }
+            .modal-text { font-size: 18px; margin-bottom: 25px; font-weight: bold; }
+            .modal-btns { display: flex; gap: 15px; justify-content: center; }
+            .modal-btn { padding: 12px 25px; border-radius: 10px; border: none; cursor: pointer; font-weight: bold; font-size: 16px; }
+            .room-overlay {
+                position: fixed;
+                top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.7);
+                backdrop-filter: blur(8px);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 9999; /* 最前面に */
+            }
+
+            .room-card {
+                background: var(--card-bg);
+                padding: 40px;
+                border-radius: 20px;
+                width: 90%;
+                max-width: 350px;
+                text-align: center;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                border-top: 5px solid var(--main-color);
+            }
+
+            .room-input {
+                width: 100%;
+                padding: 12px;
+                margin: 10px 0;
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                background: var(--card-bg);
+                color: var(--text-dark);
+                box-sizing: border-box;
+                font-size: 16px;
+                outline: none;
+            }
+
+            .room-input:focus {
+                border-color: var(--main-color);
+            }
+        </style>
+    </head>
+    
+    <body>
+
+        <div id="room-login-overlay" class="room-overlay">
+            <div class="room-card">
+                <h2 style="margin-top:0; color:var(--main-color); filter:brightness(0.8);">ROOM LOGIN</h2>
+                <p style="font-size:12px; color:#888;">部屋名とパスワードを決めて入室してください</p>
+                
+                <input type="text" id="room-id" class="room-input" placeholder="部屋名 (例: my-team)">
+                <input type="password" id="room-pw" class="room-input" placeholder="パスワード">
+                
+                <div style="margin-top:20px;">
+                    <button class="btn btn-main" style="width:100%; padding:12px;" onclick="connectOnline()">入室 ・ 部屋を作成</button>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="page-title">
+            <span>TOTAL CALCULATION</span>
+            <div class="color-picker-container">
+                <input type="color" id="colorPicker" value="#69e4f0" oninput="changeThemeColor(this.value)">
+            </div>
+            <button class="btn btn-sub" onclick="toggleDarkMode()">Dark/White</button>
+        </div>
+
+        <div id="custom-modal-overlay">
+            <div id="custom-modal">
+                <div class="modal-text" id="modal-msg">確認</div>
+                <div class="modal-btns">
+                    <button class="modal-btn" style="background:#eee;" onclick="closeModal(false)">キャンセル</button>
+                    <button class="modal-btn" id="modal-exec-btn" style="background:var(--main-color); color:#000;">実行</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 入力欄が増えるとこ -->
+         <div class="main-content">
+            <div id="input-area" class="input-card">
+                
+            </div>
+            <div class="btn-group" style="margin-top: 15px;">
+                <button class="btn btn-sub" onclick="addForm()"> + </button>
+                <button class="btn btn-sub" onclick="sortRows(true)">昇順↑</button>
+                <button class="btn btn-sub" onclick="sortRows(false)">降順↓</button>
+                <button class="btn btn-sub" onclick="renumberLabels()">番号を振り直す</button>
+                <button class="btn btn-sub" style="background:#ffaaaa;" onclick="confirmAction('すべてリセットしますか？', resetInputsOnly)">フォームリセット</button>
+            </div>
+            <div class="log-card">
+                <div class="log-card">
+                <div style="font-weight:bold; margin-bottom:10px; text-align:center;">Calculation Logs</div>
+                <div id="log-list"></div>
+            </div>
+        </div>
+
+        <!-- いろいろを表示するとこ -->
+        <div class="bottom-nav">
+            <div class="result-bar">
+                Total: <b id="total-result">0</b> | Count: <b id="count-result">0</b> | Min: <b id="min-result">-</b> | Max: <b id="max-result">-</b>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-main" onclick="calculateAll()">Calculation & Save Log</button>
+            </div>
+        </div>
+
+
+        <script type="module">
+
+            import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+            import { getAuth } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+            import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+
+            const firebaseConfig = {
+                apiKey: "AIzaSyB28UEf4D7P_HEPTPJ2LFW1qNX6eClSiV8",
+                authDomain: "total-calculation-28107.firebaseapp.com",
+                projectId: "total-calculation-28107",
+                storageBucket: "total-calculation-28107.firebasestorage.app",
+                messagingSenderId: "511218423499",
+                appId: "1:511218423499:web:e1611005d8586d89c22d4e",
+                databaseURL: "https://total-calculation-28107-default-rtdb.firebaseio.com" 
+            };
+
+            const app = initializeApp(firebaseConfig);
+            const db = getDatabase(app); // これで「db」を使ってオンライン操作ができるようになる
+            
+            // オンライン接続と同期
+            window.connectOnline = function() {
+                const roomId = document.getElementById('room-id').value;
+                const roomPw = document.getElementById('room-pw').value;
+                if (!roomId || !roomPw) return alert("入力してください");
+
+                // 参照の作り方もシンプルになります
+                const roomRef = ref(db, 'rooms/' + roomId);
+                
+                onValue(roomRef, (snapshot) => {
+                    const data = snapshot.val();
+                    const overlay = document.getElementById('room-login-overlay');
+                    if (data) {
+                        if (data.password === roomPw) {
+                            overlay.style.display = 'none';
+                            renderFromOnline(data.content);
+                        } else {
+                            alert("パスワードが違います");
+                        }
+                    } else {
+                        // 新規作成
+                        set(roomRef, { password: roomPw, content: [] }).then(() => {
+                            overlay.style.display = 'none';
+                        });
+                    }
+                });
+            };
+            
+
+           // 保存時にFirebaseへ飛ばす
+            window.saveData = function() {
+                // 共通：画面上の入力データを集める
+                const rows = Array.from(document.querySelectorAll(".input-row")).map(row => ({
+                    color: row.querySelector(".row-color-picker").value,
+                    label: row.querySelector(".label-in").value,
+                    num: row.querySelector(".num-in").value,
+                    memo: row.querySelector(".memo-in").value
+                }));
+
+                // ① 自分のパソコン（ローカル）に保存（バックアップ用）
+                localStorage.setItem('proCalcV15_data', JSON.stringify(rows));
+
+                // ② オンライン（Firebase）に保存（共有用）
+                const roomId = document.getElementById('room-id').value;
+                if (roomId) {
+                    // ログイン（入室）している時だけFirebaseへ飛ばす
+                    set(ref(db, 'rooms/' + roomId + '/content'), rows);
+                }
+            };
+
+            window. renderFromOnline = function(content) {
+                const area = document.getElementById("input-area");
+                if (content) {
+                    area.innerHTML = "";
+                    content.forEach(d => addForm(d.num, d.memo, d.label, d.color));
+                }
+            }
+
+
+
+            let draggedItem = null, draggedLog = null;
+
+            window.confirmAction = function(msg, callback) {
+                document.getElementById('modal-msg').innerText = msg;
+                document.getElementById('custom-modal-overlay').style.display = 'flex';
+                setTimeout(() => document.getElementById('custom-modal').classList.add('open'), 10);
+                
+                const execBtn = document.getElementById('modal-exec-btn');
+                execBtn.onclick = () => {
+                    callback();
+                    closeModal(false);
+                };
+            }
+
+            window.closeModal = function() {
+                document.getElementById('custom-modal').classList.remove('open');
+                setTimeout(() => { document.getElementById('custom-modal-overlay').style.display = 'none'; }, 200);
+            }
+
+            window.onload = function() {
+                if (localStorage.getItem('darkMode') === 'on') toggleDarkMode();
+                const savedColor = localStorage.getItem('themeColor');
+                if (savedColor) changeThemeColor(savedColor);
+                const savedData = JSON.parse(localStorage.getItem('proCalcV15_data'));
+                if (savedData && savedData.length > 0) savedData.forEach(d => addForm(d.num, d.memo, d.label, d.color));
+                else addForm();
+                refreshLogList(); calculateAll(false);
+            };
+
+            window.changeThemeColor = function(color) {
+                document.documentElement.style.setProperty('--main-color', color);
+                localStorage.setItem('themeColor', color);
+                document.getElementById('colorPicker').value = color;
+            }
+
+            window.toggleDarkMode = function() {
+                document.body.classList.toggle('dark-mode');
+                localStorage.setItem('darkMode', document.body.classList.contains('dark-mode') ? 'on' : 'off');
+            }
+
+            window.addForm = function(num = '', memo = '', label = '', color = '', afterTarget = null) {
+                const area = document.getElementById("input-area");
+                const div = document.createElement("div");
+                div.className = "input-row";
+                div.draggable = true;
+                const labelText = label || `No.${area.children.length + 1}`;
+                const rowColor = color || (document.body.classList.contains('dark-mode') ? '#444' : '#ddd');
+                div.style.backgroundColor = rowColor + "33";
+                div.innerHTML = `
+                    <input type="color" class="row-color-picker" value="${rowColor}" oninput="updateRowColor(this)">
+                    <input type="text" class="label-in" value="${labelText}" oninput="saveData()" style="background-color:${rowColor}33; color:${rowColor}; border-bottom:2px solid ${rowColor} !important;">
+                    <input type="number" class="num-in" value="${num}" style="border-color:${rowColor}" placeholder="0" oninput="saveData()">
+                    <input type="text" class="memo-in" value="${memo}" style="border-color:${rowColor}" placeholder="メモ" oninput="saveData()">
+                    <button class="row-btn btn-copy" onclick="copyThisRow(this)">❐</button>
+                    <button class="row-btn btn-del" onclick="removeThisRow(this)">✕</button>
+                `;
+                const inputs = div.querySelectorAll('input:not(.row-color-picker)');
+                inputs.forEach(input => {
+                    input.onmousedown = () => { div.draggable = false; };
+                    input.onmouseup = () => { div.draggable = true; };
+                });
+                div.ondragstart = (e) => { draggedItem = div; div.style.opacity = '0.4'; };
+                div.ondragend = () => { draggedItem = null; div.style.opacity = '1'; saveData(); };
+                div.ondragover = e => { e.preventDefault(); const after = getDragAfterElement(area, e.clientY, '.input-row'); if (!after) area.appendChild(div); else area.insertBefore(div, after); };
+                if (afterTarget) area.insertBefore(div, afterTarget.nextSibling); else area.appendChild(div);
+            }
+
+            window.updateRowColor = function(picker) {
+                const row = picker.parentElement, color = picker.value;
+                row.style.backgroundColor = color + "33";
+                const lbl = row.querySelector('.label-in');
+                lbl.style.backgroundColor = color + "33"; lbl.style.color = color; lbl.style.borderBottomColor = color;
+                row.querySelector('.num-in').style.borderColor = color; row.querySelector('.memo-in').style.borderColor = color;
+                saveData();
+            }
+
+            window.copyThisRow = function(btn) {
+                const row = btn.parentElement;
+                addForm(row.querySelector(".num-in").value, row.querySelector(".memo-in").value, row.querySelector(".label-in").value + "(複)", row.querySelector(".row-color-picker").value, row);
+                calculateAll(false);
+            }
+
+            window.removeThisRow = function(btn) {
+                const area = document.getElementById("input-area");
+                if (area.children.length > 1) { btn.parentElement.remove(); calculateAll(false); }
+            }
+
+            window.getDragAfterElement = function(container, y, selector) {
+                const elements = [...container.querySelectorAll(`${selector}:not([style*="opacity: 0.4"])`)];
+                return elements.reduce((closest, child) => {
+                    const box = child.getBoundingClientRect(), offset = y - box.top - box.height / 2;
+                    if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
+                    else return closest;
+                }, { offset: Number.NEGATIVE_INFINITY }).element;
+            }
+
+            window.calculateAll = function(isSave = true) {
+                const rows = Array.from(document.querySelectorAll(".input-row"));
+                let nums = [], details = [];
+                rows.forEach(row => {
+                    const n = parseFloat(row.querySelector(".num-in").value), m = row.querySelector(".memo-in").value, l = row.querySelector(".label-in").value, c = row.querySelector(".row-color-picker").value;
+                    if (!isNaN(n)) { nums.push(n); details.push({ label: l, num: n, memo: m, color: c }); }
+                });
+                if (nums.length === 0) return resetDisplay();
+                const total = nums.reduce((a,b)=>a+b,0);
+                document.getElementById("total-result").innerText = total.toLocaleString();
+                document.getElementById("count-result").innerText = nums.length;
+                document.getElementById("min-result").innerText = Math.min(...nums).toLocaleString();
+                document.getElementById("max-result").innerText = Math.max(...nums).toLocaleString();
+                saveData();
+                if (isSave) {
+                    const logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || [];
+                    logs.unshift({ id: Date.now(), time: new Date().toLocaleString(), total: total.toLocaleString(), details: details, title: "" });
+                    localStorage.setItem('proCalcV15_logs', JSON.stringify(logs));
+                    refreshLogList();
+                }
+            }
+
+            window.refreshLogList = function() {
+                const list = document.getElementById("log-list"), logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || [];
+                list.innerHTML = "";
+                logs.forEach(log => {
+                    const container = document.createElement("div");
+                    container.className = "log-item-container"; container.draggable = true; container.dataset.id = log.id;
+                    const detailText = log.details.map(d => `<div style="border-left:4px solid ${d.color}; padding-left:5px; margin-bottom:3px;">・${d.label}: <b>${d.num.toLocaleString()}</b> <small>(${d.memo || '-'})</small></div>`).join('');
+                    container.innerHTML = `
+                        <div class="log-controls">
+                            <button class="log-btn log-load-btn" onclick="confirmAction('履歴を復元しますか？', () => loadLogData(${log.id}))">復元</button>
+                            <button class="log-btn log-del-btn" onclick="confirmAction('この履歴を消去しますか？', () => deleteLog(${log.id}))">×</button>
+                        </div>
+                        <input type="text" class="log-entry-title" value="${log.title || ''}" placeholder="履歴タイトル" oninput="updateLogTitle(${log.id}, this.value)">
+                        <div class="log-summary" onclick="toggleLogDetails(this)"><span>${log.time}</span><span>Total: <b>${log.total}</b> <span class="arrow">▲</span></span></div>
+                        <div class="log-details">${detailText}</div>
+                    `;
+                    container.ondragstart = (e) => { if(e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return e.preventDefault(); draggedLog = container; container.classList.add('dragging'); };
+                    container.ondragend = () => { draggedLog = null; container.classList.remove('dragging'); saveLogOrder(); };
+                    list.ondragover = e => { e.preventDefault(); const after = getDragAfterElement(list, e.clientY, '.log-item-container'); if (!after) list.appendChild(draggedLog); else list.insertBefore(draggedLog, after); };
+                    list.appendChild(container);
+                });
+            }
+
+            window.loadLogData = function(id) {
+                const logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || [], target = logs.find(log => log.id === id);
+                if(target) { document.getElementById("input-area").innerHTML = ""; target.details.forEach(d => addForm(d.num, d.memo, d.label, d.color)); calculateAll(false); window.scrollTo(0,0); }
+            }
+
+            window.saveLogOrder = function() {
+                const list = document.getElementById("log-list"), ids = Array.from(list.querySelectorAll('.log-item-container')).map(el => parseInt(el.dataset.id)), logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || [];
+                localStorage.setItem('proCalcV15_logs', JSON.stringify(ids.map(id => logs.find(l => l.id === id))));
+            }
+
+            window.toggleLogDetails = function(sum) { const det = sum.nextElementSibling, arr = sum.querySelector('.arrow'); det.classList.toggle('show'); arr.innerText = det.classList.contains('show') ? '▼' : '▲'; }
+            window.updateLogTitle = function(id, v) { let logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || []; const idx = logs.findIndex(l => l.id === id); if (idx !== -1) { logs[idx].title = v; localStorage.setItem('proCalcV15_logs', JSON.stringify(logs)); } }
+            window.deleteLog = function(id) { let logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || []; localStorage.setItem('proCalcV15_logs', JSON.stringify(logs.filter(l => l.id !== id))); refreshLogList(); }
+            window.resetInputsOnly = function() { document.getElementById("input-area").innerHTML = ""; addForm(); resetDisplay(); saveData(); }
+            window.sortRows = function(asc) { const area = document.getElementById("input-area"), rows = Array.from(area.children); rows.sort((a,b) => (parseFloat(a.querySelector(".num-in").value)||0) - (parseFloat(b.querySelector(".num-in").value)||0)); if(!asc) rows.reverse(); rows.forEach(r => area.appendChild(r)); saveData(); }
+            window.renumberLabels = function() { document.querySelectorAll(".label-in").forEach((l, i) => { l.value = `No.${i + 1}`; updateRowColor(l.parentElement.querySelector('.row-color-picker')); }); saveData(); }
+            window.resetDisplay = function() { document.getElementById("total-result").innerText = "0"; document.getElementById("count-result").innerText = "0"; document.getElementById("min-result").innerText = "-"; document.getElementById("max-result").innerText = "-"; }
+        </script>
+    </body>
+</html>
