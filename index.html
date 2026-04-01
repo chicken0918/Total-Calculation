@@ -43,7 +43,7 @@
             .btn-sub { background: #eee; color: #333; }
             .result-bar b { color: var(--main-color); font-size: 26px; filter: brightness(0.8); }
 
-            #custom-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+            #custom-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
             #custom-modal { background: var(--card-bg); padding: 30px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.3); transform: scale(0.8); transition: 0.2s; border-top: 10px solid var(--main-color); }
             #custom-modal.open { transform: scale(1); }
             .modal-text { font-size: 18px; margin-bottom: 25px; font-weight: bold; }
@@ -92,13 +92,14 @@
     
     <body>
 
-        <div id="room-login-overlay" class="room-overlay">
+        <div id="room-login-overlay" class="room-overlay" style="display: none;">
             <div class="room-card">
                 <h2 style="margin-top:0; color:var(--main-color); filter:brightness(0.8);">ROOM LOGIN</h2>
                 <p style="font-size:12px; color:#888;">部屋名とパスワードを決めて入室してください</p>
                 
                 <input type="text" id="room-id" class="room-input" placeholder="部屋名 (例: my-team)">
                 <input type="password" id="room-pw" class="room-input" placeholder="パスワード">
+                <div id="pw-error" style="font-size:12px; color:#d00; margin-top:5px; display:none;"></div>
                 
                 <div style="margin-top:20px;">
                     <button class="btn btn-main" style="width:100%; padding:12px;" onclick="connectOnline()">入室 ・ 部屋を作成</button>
@@ -106,17 +107,26 @@
             </div>
         </div>
 
+        <div id="mode-selector-overlay" class="room-overlay">
+            <div class="room-card">
+                <h2 style="margin-top:0; color:var(--main-color); filter:brightness(0.8);">モード選択</h2>
+                <p style="font-size:14px; margin-bottom:30px;">どちらで使いますか？</p>
+                
+                <div style="display: flex; gap: 15px; justify-content: center; white-space: nowrap;">
+                    <button class="btn btn-main" style="padding:15px 40px; font-size:18px;" onclick="chooseModeAndStart('offline')">オフライン</button>
+                    <button class="btn btn-main" style="padding:15px 40px; font-size:18px;" onclick="chooseModeAndStart('online')">オンライン</button>
+                </div>
+            </div>
+        </div>
+
 
         <div class="page-title">
             <span>TOTAL CALCULATION</span>
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <label><input type="radio" name="mode" value="offline" checked onchange="setMode('offline')"> オフライン</label>
-                <label><input type="radio" name="mode" value="online" onchange="setMode('online')"> オンライン</label>
-            </div>
             <div class="color-picker-container">
                 <input type="color" id="colorPicker" value="#69e4f0" oninput="changeThemeColor(this.value)">
             </div>
             <button class="btn btn-sub" onclick="toggleDarkMode()">Dark/White</button>
+            <button class="btn btn-sub" onclick="toggleModeSelector()" title="モード変更">モード選択</button>
         </div>
 
         <div id="custom-modal-overlay">
@@ -180,6 +190,13 @@
 
             let currentMode = 'offline';
             let isOnlineConnected = false;
+            let isRendering = false;
+            let saveTimeout;
+
+            window.debouncedSaveData = function() {
+                clearTimeout(saveTimeout);
+                saveTimeout = setTimeout(() => saveData(), 500);
+            }
             
             // オンライン接続と同期
             window.connectOnline = function() {
@@ -187,21 +204,28 @@
                 const roomPw = document.getElementById('room-pw').value;
                 if (!roomId || !roomPw) return alert("入力してください");
 
-                // 参照の作り方もシンプルになります
                 const roomRef = ref(db, 'rooms/' + roomId);
                 
                 onValue(roomRef, (snapshot) => {
                     const data = snapshot.val();
                     const overlay = document.getElementById('room-login-overlay');
+                    const roomPwInput = document.getElementById('room-pw');
+                    const pwError = document.getElementById('pw-error');
                     if (data) {
                         if (data.password === roomPw) {
+                            roomPwInput.style.borderColor = '';
+                            pwError.style.display = 'none';
                             overlay.style.display = 'none';
                             renderFromOnline(data.content, data.logs);
                         } else {
-                            alert("パスワードが違います");
+                            roomPwInput.style.borderColor = '#d00';
+                            pwError.textContent = 'パスワードが違います';
+                            pwError.style.display = 'block';
                         }
                     } else {
                         // 新規作成
+                        roomPwInput.style.borderColor = '';
+                        pwError.style.display = 'none';
                         set(roomRef, { password: roomPw, content: [], logs: [] }).then(() => {
                             overlay.style.display = 'none';
                             renderFromOnline([], []);
@@ -213,12 +237,13 @@
             window.setMode = function(mode) {
                 currentMode = mode;
                 localStorage.setItem('currentMode', mode);
+                document.getElementById('mode-selector-overlay').style.display = 'none';
                 if (mode === 'online') {
                     document.getElementById('room-login-overlay').style.display = 'flex';
+                    isOnlineConnected = false; // 入室時にtrue化
                 } else {
                     document.getElementById('room-login-overlay').style.display = 'none';
                     isOnlineConnected = false;
-                    // オフライン時はローカルからデータを読み込み
                     loadDataFromLocal();
                 }
             };
@@ -238,7 +263,7 @@
                 localStorage.setItem('proCalcV15_data', JSON.stringify(rows));
 
                 // ② オンライン（Firebase）に保存（共有用）
-                if (currentMode === 'online' && isOnlineConnected) {
+                if (currentMode === 'online' && isOnlineConnected && !isRendering) {
                     const roomId = document.getElementById('room-id').value;
                     if (roomId) {
                         set(ref(db, 'rooms/' + roomId + '/content'), rows);
@@ -260,19 +285,48 @@
             };
 
             window. renderFromOnline = function(content, logs) {
+                isRendering = true;
                 isOnlineConnected = true;
                 const area = document.getElementById("input-area");
+                // 現在のフォーカスと入力値を保存
+                const activeElement = document.activeElement;
+                const currentInputs = Array.from(area.querySelectorAll('.input-row')).map(row => ({
+                    color: row.querySelector('.row-color-picker')?.value || '',
+                    label: row.querySelector('.label-in')?.value || '',
+                    num: row.querySelector('.num-in')?.value || '',
+                    memo: row.querySelector('.memo-in')?.value || ''
+                }));
+                area.innerHTML = "";
                 if (content) {
-                    area.innerHTML = "";
-                    content.forEach(d => addForm(d.num, d.memo, d.label, d.color));
+                    content.forEach((d, index) => {
+                        const saved = currentInputs[index] || {};
+                        const isLast = index === content.length - 1;
+                        addForm(saved.num || d.num, saved.memo || d.memo, saved.label || d.label, saved.color || d.color, null, !isLast);
+                    });
                 } else {
                     addForm();
+                }
+                // フォーカスを復元
+                if (activeElement && activeElement.tagName === 'INPUT' && activeElement.closest('#input-area')) {
+                    const rows = area.querySelectorAll('.input-row');
+                    const rowIndex = Array.from(activeElement.closest('.input-row').parentNode.children).indexOf(activeElement.closest('.input-row'));
+                    if (rows[rowIndex]) {
+                        const inputs = rows[rowIndex].querySelectorAll('input');
+                        const inputIndex = ['row-color-picker', 'label-in', 'num-in', 'memo-in'].indexOf(activeElement.className);
+                        if (inputs[inputIndex]) {
+                            inputs[inputIndex].focus();
+                            if (activeElement.selectionStart !== undefined) {
+                                inputs[inputIndex].setSelectionRange(activeElement.selectionStart, activeElement.selectionEnd);
+                            }
+                        }
+                    }
                 }
                 if (logs) {
                     localStorage.setItem('proCalcV15_logs', JSON.stringify(logs));
                 }
                 refreshLogList();
                 calculateAll(false);
+                isRendering = false;
             }
 
 
@@ -285,7 +339,9 @@
                 setTimeout(() => document.getElementById('custom-modal').classList.add('open'), 10);
                 
                 const execBtn = document.getElementById('modal-exec-btn');
-                execBtn.onclick = () => {
+                execBtn.onclick = null;
+                execBtn.onclick = (event) => {
+                    event.stopPropagation();
                     callback();
                     closeModal(false);
                 };
@@ -300,9 +356,22 @@
                 if (localStorage.getItem('darkMode') === 'on') toggleDarkMode();
                 const savedColor = localStorage.getItem('themeColor');
                 if (savedColor) changeThemeColor(savedColor);
-                const savedMode = localStorage.getItem('currentMode') || 'offline';
-                document.querySelector(`input[name="mode"][value="${savedMode}"]`).checked = true;
-                setMode(savedMode);
+                // 常に起動時はモード選択を優先（オンライン/オフライン選択画面を最初に出す）
+                document.getElementById('mode-selector-overlay').style.display = 'flex';
+                document.getElementById('room-login-overlay').style.display = 'none';
+            };
+
+            window.chooseModeAndStart = function(mode) {
+                document.getElementById('mode-selector-overlay').style.display = 'none';
+                localStorage.setItem('currentMode', mode);
+                if (document.querySelector(`input[name="mode"][value="${mode}"]`)) {
+                    document.querySelector(`input[name="mode"][value="${mode}"]`).checked = true;
+                }
+                setMode(mode);
+            };
+
+            window.toggleModeSelector = function() {
+                document.getElementById('mode-selector-overlay').style.display = 'flex';
             };
 
             window.changeThemeColor = function(color) {
@@ -316,40 +385,58 @@
                 localStorage.setItem('darkMode', document.body.classList.contains('dark-mode') ? 'on' : 'off');
             }
 
-            window.addForm = function(num = '', memo = '', label = '', color = '', afterTarget = null) {
+            window.normalizeColor = function(rawColor) {
+                if (!rawColor || typeof rawColor !== 'string') return '#dddddd';
+                if (/^#([0-9a-fA-F]{3})$/.test(rawColor)) {
+                    const r = rawColor[1];
+                    const g = rawColor[2];
+                    const b = rawColor[3];
+                    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+                }
+                if (/^#([0-9a-fA-F]{6})$/.test(rawColor)) {
+                    return rawColor.toLowerCase();
+                }
+                return '#dddddd';
+            }
+
+            window.addForm = function(num = '', memo = '', label = '', color = '', afterTarget = null, skipCalculate = false) {
                 const area = document.getElementById("input-area");
                 const div = document.createElement("div");
                 div.className = "input-row";
-                div.draggable = true;
+                div.draggable = false;
                 const labelText = label || `No.${area.children.length + 1}`;
-                const rowColor = color || (document.body.classList.contains('dark-mode') ? '#444' : '#ddd');
+                const rowColor = normalizeColor(color || (document.body.classList.contains('dark-mode') ? '#444' : '#ddd'));
                 div.style.backgroundColor = rowColor + "33";
                 div.innerHTML = `
-                    <input type="color" class="row-color-picker" value="${rowColor}" oninput="updateRowColor(this)">
-                    <input type="text" class="label-in" value="${labelText}" oninput="saveData()" style="background-color:${rowColor}33; color:${rowColor}; border-bottom:2px solid ${rowColor} !important;">
-                    <input type="number" class="num-in" value="${num}" style="border-color:${rowColor}" placeholder="0" oninput="saveData()">
-                    <input type="text" class="memo-in" value="${memo}" style="border-color:${rowColor}" placeholder="メモ" oninput="saveData()">
+                    <input type="color" class="row-color-picker" value="${rowColor}" oninput="setTimeout(() => updateRowColor(this), 100)">
+                    <input type="text" class="label-in" value="${labelText}" oninput="debouncedSaveData()" style="background-color:${rowColor}33; color:${rowColor}; border-bottom:2px solid ${rowColor} !important;">
+                    <input type="number" class="num-in" value="${num}" style="border-color:${rowColor}" placeholder="0" oninput="debouncedSaveData()">
+                    <input type="text" class="memo-in" value="${memo}" style="border-color:${rowColor}" placeholder="メモ" oninput="debouncedSaveData()">
                     <button class="row-btn btn-copy" onclick="copyThisRow(this)">❐</button>
                     <button class="row-btn btn-del" onclick="removeThisRow(this)">✕</button>
                 `;
-                const inputs = div.querySelectorAll('input:not(.row-color-picker)');
+                const inputs = div.querySelectorAll('input');
                 inputs.forEach(input => {
-                    input.onmousedown = () => { div.draggable = false; };
-                    input.onmouseup = () => { div.draggable = true; };
+                    input.draggable = false;
                 });
-                div.ondragstart = (e) => { draggedItem = div; div.style.opacity = '0.4'; };
-                div.ondragend = () => { draggedItem = null; div.style.opacity = '1'; saveData(); };
-                div.ondragover = e => { e.preventDefault(); const after = getDragAfterElement(area, e.clientY, '.input-row'); if (!after) area.appendChild(div); else area.insertBefore(div, after); };
+                const buttons = div.querySelectorAll('button');
+                buttons.forEach(button => {
+                    button.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+                    button.addEventListener('pointerdown', (e) => e.stopPropagation());
+                });
                 if (afterTarget) area.insertBefore(div, afterTarget.nextSibling); else area.appendChild(div);
+                if (!skipCalculate) calculateAll(false);
             }
 
             window.updateRowColor = function(picker) {
-                const row = picker.parentElement, color = picker.value;
+                const row = picker.parentElement;
+                const color = normalizeColor(picker.value);
+                picker.value = color;
                 row.style.backgroundColor = color + "33";
                 const lbl = row.querySelector('.label-in');
                 lbl.style.backgroundColor = color + "33"; lbl.style.color = color; lbl.style.borderBottomColor = color;
                 row.querySelector('.num-in').style.borderColor = color; row.querySelector('.memo-in').style.borderColor = color;
-                saveData();
+                debouncedSaveData();
             }
 
             window.copyThisRow = function(btn) {
@@ -377,7 +464,8 @@
                 let nums = [], details = [];
                 rows.forEach(row => {
                     const n = parseFloat(row.querySelector(".num-in").value), m = row.querySelector(".memo-in").value, l = row.querySelector(".label-in").value, c = row.querySelector(".row-color-picker").value;
-                    if (!isNaN(n)) { nums.push(n); details.push({ label: l, num: n, memo: m, color: c }); }
+                    if (!isNaN(n)) { nums.push(n); }
+                    details.push({ label: l, num: isNaN(n) ? 0 : n, memo: m, color: c });
                 });
                 if (nums.length === 0) return resetDisplay();
                 const total = nums.reduce((a,b)=>a+b,0);
@@ -390,7 +478,7 @@
                     const logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || [];
                     logs.unshift({ id: Date.now(), time: new Date().toLocaleString(), total: total.toLocaleString(), details: details, title: "" });
                     localStorage.setItem('proCalcV15_logs', JSON.stringify(logs));
-                    if (currentMode === 'online' && isOnlineConnected) {
+                    if (currentMode === 'online' && isOnlineConnected && !isRendering) {
                         const roomId = document.getElementById('room-id').value;
                         if (roomId) {
                             set(ref(db, 'rooms/' + roomId + '/logs'), logs);
@@ -425,7 +513,25 @@
 
             window.loadLogData = function(id) {
                 const logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || [], target = logs.find(log => log.id === id);
-                if(target) { document.getElementById("input-area").innerHTML = ""; target.details.forEach(d => addForm(d.num, d.memo, d.label, d.color)); calculateAll(false); window.scrollTo(0,0); }
+                if(target) { 
+                    document.getElementById("input-area").innerHTML = ""; 
+                    target.details.forEach((d, index) => {
+                        const num = isNaN(d.num) ? '' : d.num;
+                        const isLast = index === target.details.length - 1;
+                        addForm(num, d.memo, d.label, d.color, null, !isLast);
+                    }); 
+                    calculateAll(false); 
+                    window.scrollTo(0,0); 
+                }
+            }
+
+            window.saveLogsToFirebase = function(logs) {
+                if (currentMode === 'online' && isOnlineConnected) {
+                    const roomId = document.getElementById('room-id').value;
+                    if (roomId) {
+                        set(ref(db, 'rooms/' + roomId + '/logs'), logs);
+                    }
+                }
             }
 
             window.saveLogOrder = function() {
@@ -437,7 +543,13 @@
 
             window.toggleLogDetails = function(sum) { const det = sum.nextElementSibling, arr = sum.querySelector('.arrow'); det.classList.toggle('show'); arr.innerText = det.classList.contains('show') ? '▼' : '▲'; }
             window.updateLogTitle = function(id, v) { let logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || []; const idx = logs.findIndex(l => l.id === id); if (idx !== -1) { logs[idx].title = v; localStorage.setItem('proCalcV15_logs', JSON.stringify(logs)); saveLogsToFirebase(logs); } }
-            window.deleteLog = function(id) { let logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || []; logs = logs.filter(l => l.id !== id); localStorage.setItem('proCalcV15_logs', JSON.stringify(logs)); saveLogsToFirebase(logs); refreshLogList(); }
+            window.deleteLog = function(id) { 
+                let logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || []; 
+                logs = logs.filter(l => l.id !== id); 
+                localStorage.setItem('proCalcV15_logs', JSON.stringify(logs)); 
+                saveLogsToFirebase(logs); 
+                refreshLogList(); 
+            }
             window.resetInputsOnly = function() { document.getElementById("input-area").innerHTML = ""; addForm(); resetDisplay(); saveData(); }
             window.sortRows = function(asc) { const area = document.getElementById("input-area"), rows = Array.from(area.children); rows.sort((a,b) => (parseFloat(a.querySelector(".num-in").value)||0) - (parseFloat(b.querySelector(".num-in").value)||0)); if(!asc) rows.reverse(); rows.forEach(r => area.appendChild(r)); saveData(); }
             window.renumberLabels = function() { document.querySelectorAll(".label-in").forEach((l, i) => { l.value = `No.${i + 1}`; updateRowColor(l.parentElement.querySelector('.row-color-picker')); }); saveData(); }
