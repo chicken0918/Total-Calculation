@@ -109,6 +109,10 @@
 
         <div class="page-title">
             <span>TOTAL CALCULATION</span>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label><input type="radio" name="mode" value="offline" checked onchange="setMode('offline')"> オフライン</label>
+                <label><input type="radio" name="mode" value="online" onchange="setMode('online')"> オンライン</label>
+            </div>
             <div class="color-picker-container">
                 <input type="color" id="colorPicker" value="#69e4f0" oninput="changeThemeColor(this.value)">
             </div>
@@ -173,6 +177,9 @@
 
             const app = initializeApp(firebaseConfig);
             const db = getDatabase(app); // これで「db」を使ってオンライン操作ができるようになる
+
+            let currentMode = 'offline';
+            let isOnlineConnected = false;
             
             // オンライン接続と同期
             window.connectOnline = function() {
@@ -189,17 +196,31 @@
                     if (data) {
                         if (data.password === roomPw) {
                             overlay.style.display = 'none';
-                            renderFromOnline(data.content);
+                            renderFromOnline(data.content, data.logs);
                         } else {
                             alert("パスワードが違います");
                         }
                     } else {
                         // 新規作成
-                        set(roomRef, { password: roomPw, content: [] }).then(() => {
+                        set(roomRef, { password: roomPw, content: [], logs: [] }).then(() => {
                             overlay.style.display = 'none';
+                            renderFromOnline([], []);
                         });
                     }
                 });
+            };
+
+            window.setMode = function(mode) {
+                currentMode = mode;
+                localStorage.setItem('currentMode', mode);
+                if (mode === 'online') {
+                    document.getElementById('room-login-overlay').style.display = 'flex';
+                } else {
+                    document.getElementById('room-login-overlay').style.display = 'none';
+                    isOnlineConnected = false;
+                    // オフライン時はローカルからデータを読み込み
+                    loadDataFromLocal();
+                }
             };
             
 
@@ -217,19 +238,41 @@
                 localStorage.setItem('proCalcV15_data', JSON.stringify(rows));
 
                 // ② オンライン（Firebase）に保存（共有用）
-                const roomId = document.getElementById('room-id').value;
-                if (roomId) {
-                    // ログイン（入室）している時だけFirebaseへ飛ばす
-                    set(ref(db, 'rooms/' + roomId + '/content'), rows);
+                if (currentMode === 'online' && isOnlineConnected) {
+                    const roomId = document.getElementById('room-id').value;
+                    if (roomId) {
+                        set(ref(db, 'rooms/' + roomId + '/content'), rows);
+                    }
                 }
             };
 
-            window. renderFromOnline = function(content) {
+            window.loadDataFromLocal = function() {
+                const savedData = JSON.parse(localStorage.getItem('proCalcV15_data'));
+                const area = document.getElementById("input-area");
+                area.innerHTML = "";
+                if (savedData && savedData.length > 0) {
+                    savedData.forEach(d => addForm(d.num, d.memo, d.label, d.color));
+                } else {
+                    addForm();
+                }
+                refreshLogList();
+                calculateAll(false);
+            };
+
+            window. renderFromOnline = function(content, logs) {
+                isOnlineConnected = true;
                 const area = document.getElementById("input-area");
                 if (content) {
                     area.innerHTML = "";
                     content.forEach(d => addForm(d.num, d.memo, d.label, d.color));
+                } else {
+                    addForm();
                 }
+                if (logs) {
+                    localStorage.setItem('proCalcV15_logs', JSON.stringify(logs));
+                }
+                refreshLogList();
+                calculateAll(false);
             }
 
 
@@ -257,10 +300,9 @@
                 if (localStorage.getItem('darkMode') === 'on') toggleDarkMode();
                 const savedColor = localStorage.getItem('themeColor');
                 if (savedColor) changeThemeColor(savedColor);
-                const savedData = JSON.parse(localStorage.getItem('proCalcV15_data'));
-                if (savedData && savedData.length > 0) savedData.forEach(d => addForm(d.num, d.memo, d.label, d.color));
-                else addForm();
-                refreshLogList(); calculateAll(false);
+                const savedMode = localStorage.getItem('currentMode') || 'offline';
+                document.querySelector(`input[name="mode"][value="${savedMode}"]`).checked = true;
+                setMode(savedMode);
             };
 
             window.changeThemeColor = function(color) {
@@ -348,6 +390,12 @@
                     const logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || [];
                     logs.unshift({ id: Date.now(), time: new Date().toLocaleString(), total: total.toLocaleString(), details: details, title: "" });
                     localStorage.setItem('proCalcV15_logs', JSON.stringify(logs));
+                    if (currentMode === 'online' && isOnlineConnected) {
+                        const roomId = document.getElementById('room-id').value;
+                        if (roomId) {
+                            set(ref(db, 'rooms/' + roomId + '/logs'), logs);
+                        }
+                    }
                     refreshLogList();
                 }
             }
@@ -382,12 +430,14 @@
 
             window.saveLogOrder = function() {
                 const list = document.getElementById("log-list"), ids = Array.from(list.querySelectorAll('.log-item-container')).map(el => parseInt(el.dataset.id)), logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || [];
-                localStorage.setItem('proCalcV15_logs', JSON.stringify(ids.map(id => logs.find(l => l.id === id))));
-            }
+                const orderedLogs = ids.map(id => logs.find(l => l.id === id));
+                localStorage.setItem('proCalcV15_logs', JSON.stringify(orderedLogs));
+                saveLogsToFirebase(orderedLogs);
+            };
 
             window.toggleLogDetails = function(sum) { const det = sum.nextElementSibling, arr = sum.querySelector('.arrow'); det.classList.toggle('show'); arr.innerText = det.classList.contains('show') ? '▼' : '▲'; }
-            window.updateLogTitle = function(id, v) { let logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || []; const idx = logs.findIndex(l => l.id === id); if (idx !== -1) { logs[idx].title = v; localStorage.setItem('proCalcV15_logs', JSON.stringify(logs)); } }
-            window.deleteLog = function(id) { let logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || []; localStorage.setItem('proCalcV15_logs', JSON.stringify(logs.filter(l => l.id !== id))); refreshLogList(); }
+            window.updateLogTitle = function(id, v) { let logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || []; const idx = logs.findIndex(l => l.id === id); if (idx !== -1) { logs[idx].title = v; localStorage.setItem('proCalcV15_logs', JSON.stringify(logs)); saveLogsToFirebase(logs); } }
+            window.deleteLog = function(id) { let logs = JSON.parse(localStorage.getItem('proCalcV15_logs')) || []; logs = logs.filter(l => l.id !== id); localStorage.setItem('proCalcV15_logs', JSON.stringify(logs)); saveLogsToFirebase(logs); refreshLogList(); }
             window.resetInputsOnly = function() { document.getElementById("input-area").innerHTML = ""; addForm(); resetDisplay(); saveData(); }
             window.sortRows = function(asc) { const area = document.getElementById("input-area"), rows = Array.from(area.children); rows.sort((a,b) => (parseFloat(a.querySelector(".num-in").value)||0) - (parseFloat(b.querySelector(".num-in").value)||0)); if(!asc) rows.reverse(); rows.forEach(r => area.appendChild(r)); saveData(); }
             window.renumberLabels = function() { document.querySelectorAll(".label-in").forEach((l, i) => { l.value = `No.${i + 1}`; updateRowColor(l.parentElement.querySelector('.row-color-picker')); }); saveData(); }
