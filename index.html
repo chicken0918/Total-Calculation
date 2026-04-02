@@ -96,6 +96,26 @@
                 display: flex;
                 gap: 10px;
                 align-items: center;
+                max-width: 200px;
+            }
+
+            .user-more-btn {
+                width: 40px;
+                height: 40px;
+                border-radius: 20px;
+                border: 2px solid var(--main-color);
+                background: var(--card-bg);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                color: var(--text-dark);
+                font-size: 18px;
+            }
+
+            .user-more-btn:hover {
+                background: rgba(0,0,0,0.05);
             }
 
             .user-avatar {
@@ -105,6 +125,10 @@
                 border: 2px solid var(--main-color);
                 cursor: pointer;
                 position: relative;
+            }
+
+            .user-avatar.self {
+                border-color: #ff0000; /* 自分のアバターを赤く */
             }
 
             .user-avatar:hover .user-tooltip {
@@ -131,12 +155,126 @@
                 height: 60px;
                 border-radius: 30px;
                 margin-bottom: 5px;
+                position: relative;
+            }
+
+            .user-tooltip {
+                display: none;
+                position: absolute;
+                top: 50px;
+                right: 0;
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                padding: 10px;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+                z-index: 1001;
+                text-align: center;
+                min-width: 120px;
+                pointer-events: auto;
+            }
+
+            .user-tooltip .avatar-detail {
+                position: relative;
+                display: inline-block;
+            }
+            .user-tooltip .avatar-detail img {
+                width: 60px;
+                height: 60px;
+                border-radius: 30px;
+                margin-bottom: 5px;
+            }
+
+            .user-tooltip .camera-icon {
+                position: absolute;
+                bottom: 2px;
+                right: 2px;
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: rgba(255,255,255,0);
+                border: 1px solid rgba(0,0,0,0.2);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #007bff;
+                font-size: 12px;
+                cursor: pointer;
+                z-index: 2;
+                transition: background 0.2s, transform 0.1s;
+            }
+
+            .user-tooltip .camera-icon:hover {
+                background: rgba(255,255,255,0.9);
+                transform: scale(1.1);
+            }
+
+            .user-tooltip .edit-name {
+                position: relative;
+                display: inline-block;
+                padding-right: 20px;
+            }
+
+            .user-tooltip .pencil-icon {
+                position: absolute;
+                bottom: -6px;
+                right: -6px;
+                width: 18px;
+                height: 18px;
+                background: transparent;
+                border: 1px solid rgba(0, 0, 0, 0.2);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #000;
+                font-size: 12px;
+                cursor: pointer;
+            }
+
+            .user-tooltip .edit-name {
+                position: relative;
+                display: inline-block;
+                padding-right: 20px;
+            }
+
+            .user-tooltip .pencil-icon {
+                position: absolute;
+                bottom: -6px;
+                right: -6px;
+                width: 18px;
+                height: 18px;
+                background: transparent;
+                border: 1px solid rgba(0, 0, 0, 0.2);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #000;
+                font-size: 12px;
+                cursor: pointer;
             }
 
             .user-tooltip .user-name {
                 font-weight: bold;
                 color: var(--text-dark);
             }
+
+            .mobile-warning {
+                position: fixed;
+                bottom: 10px;
+                right: 10px;
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                padding: 5px 10px;
+                font-size: 12px;
+                color: var(--text-dark);
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                z-index: 1002;
+                display: none;
+            }
+        </style>
         </style>
     </head>
     
@@ -157,7 +295,7 @@
             </div>
         </div>
 
-        <div id="mode-selector-overlay" class="room-overlay">
+        <div id="mode-selector-overlay" class="room-overlay" style="z-index: 10000;">
             <div class="room-card">
                 <h2 style="margin-top:0; color:var(--main-color); filter:brightness(0.8);">モード選択</h2>
                 <p style="font-size:14px; margin-bottom:30px;">どちらで使いますか？</p>
@@ -175,9 +313,9 @@
             <div class="color-picker-container">
                 <input type="color" id="colorPicker" value="#69e4f0" oninput="changeThemeColor(this.value)">
             </div>
-            <button class="btn btn-sub" onclick="toggleDarkMode()">Dark/White</button>
-            <button class="btn btn-sub" onclick="toggleModeSelector()" title="モード変更">モード選択</button>
+            <button class="btn btn-sub" onclick="openSettingsModal()">設定</button>
             <div id="user-list" class="user-list"></div>
+            <button class="btn btn-sub" onclick="openUserListModal()" title="ユーザー一覧">ユーザー一覧</button>
         </div>
 
         <div id="custom-modal-overlay">
@@ -186,6 +324,47 @@
                 <div class="modal-btns">
                     <button class="modal-btn" style="background:#eee;" onclick="closeModal(false)">キャンセル</button>
                     <button class="modal-btn" id="modal-exec-btn" style="background:var(--main-color); color:#000;">実行</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="settings-modal-overlay" class="room-overlay" style="display: none;">
+            <div class="room-card">
+                <h2 style="margin-top:0; color:var(--main-color); filter:brightness(0.8);">設定</h2>
+                <div style="display: flex; flex-direction: column; gap: 10px; margin: 20px 0;">
+                    <button class="btn btn-sub" style="width:100%; padding:12px;" onclick="toggleDarkMode()">Dark/White</button>
+                    <button class="btn btn-sub" style="width:100%; padding:12px;" onclick="toggleModeSelector()">モード切替</button>
+                </div>
+                <div style="margin-top:20px;">
+                    <button class="btn btn-main" style="width:100%; padding:12px;" onclick="closeSettingsModal()">閉じる</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="avatar-selector-overlay" class="room-overlay" style="display: none;">
+            <div class="room-card">
+                <h2 style="margin-top:0; color:var(--main-color); filter:brightness(0.8);">アバター選択</h2>
+                <div id="avatar-options" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 20px 0;">
+                    <!-- アバターオプションがここに挿入される -->
+                </div>
+                <div style="margin: 20px 0; text-align: center;">
+                    <input type="file" id="avatar-file" accept="image/*" style="display: none;">
+                    <button class="btn btn-sub" onclick="document.getElementById('avatar-file').click()">ファイルから選択</button>
+                </div>
+                <div style="margin-top:20px;">
+                    <button class="btn btn-main" style="width:100%; padding:12px;" onclick="closeAvatarSelector()">閉じる</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="user-list-modal-overlay" class="room-overlay" style="display: none;">
+            <div class="room-card">
+                <h2 style="margin-top:0; color:var(--main-color); filter:brightness(0.8);">ユーザー一覧</h2>
+                <div id="user-list-content" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; max-height: 400px; overflow-y: auto;">
+                    <!-- ユーザー情報がここに挿入される -->
+                </div>
+                <div style="margin-top:20px;">
+                    <button class="btn btn-main" style="width:100%; padding:12px;" onclick="closeUserListModal()">閉じる</button>
                 </div>
             </div>
         </div>
@@ -220,6 +399,10 @@
         </div>
 
 
+        <div class="mobile-warning" id="mobile-warning">
+            ※このサイトはタブレットまたはパソコンで見ることを推奨しています
+        </div>
+
         <script type="module">
 
             import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
@@ -238,6 +421,17 @@
 
             const app = initializeApp(firebaseConfig);
             const db = getDatabase(app); // これで「db」を使ってオンライン操作ができるようになる
+
+            const avatarOptions = [
+                'https://api.dicebear.com/7.x/avataaars/svg?seed=1',
+                'https://api.dicebear.com/7.x/avataaars/svg?seed=2',
+                'https://api.dicebear.com/7.x/avataaars/svg?seed=3',
+                'https://api.dicebear.com/7.x/avataaars/svg?seed=4',
+                'https://api.dicebear.com/7.x/avataaars/svg?seed=5',
+                'https://api.dicebear.com/7.x/avataaars/svg?seed=6',
+                'https://api.dicebear.com/7.x/avataaars/svg?seed=7',
+                'https://api.dicebear.com/7.x/avataaars/svg?seed=8'
+            ];
 
             let currentMode = 'offline';
             let isOnlineConnected = false;
@@ -274,7 +468,7 @@
                                 currentUserId = localStorage.getItem('userId') || push(ref(db, 'rooms/' + roomId + '/users')).key;
                                 localStorage.setItem('userId', currentUserId);
                                 const userName = generateRandomName();
-                                const userAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUserId}`;
+                                const userAvatar = generateRandomAvatar();
                                 const userRef = ref(db, 'rooms/' + roomId + '/users/' + currentUserId);
                                 set(userRef, { name: userName, avatar: userAvatar });
                                 onDisconnect(userRef).remove();
@@ -302,7 +496,7 @@
                                 currentUserId = localStorage.getItem('userId') || push(ref(db, 'rooms/' + roomId + '/users')).key;
                                 localStorage.setItem('userId', currentUserId);
                                 const userName = generateRandomName();
-                                const userAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUserId}`;
+                                const userAvatar = generateRandomAvatar();
                                 const userRef = ref(db, 'rooms/' + roomId + '/users/' + currentUserId);
                                 set(userRef, { name: userName, avatar: userAvatar });
                                 onDisconnect(userRef).remove();
@@ -420,7 +614,7 @@
 
 
 
-            let draggedItem = null, draggedLog = null;
+            let draggedItem = null, draggedLog = null, afterElement = null, afterLogElement = null, placeholder = null;
 
             window.confirmAction = function(msg, callback) {
                 document.getElementById('modal-msg').innerText = msg;
@@ -441,6 +635,88 @@
                 setTimeout(() => { document.getElementById('custom-modal-overlay').style.display = 'none'; }, 200);
             }
 
+            window.openSettingsModal = function() {
+                document.getElementById('settings-modal-overlay').style.display = 'flex';
+            }
+
+            window.closeSettingsModal = function() {
+                document.getElementById('settings-modal-overlay').style.display = 'none';
+            }
+
+            window.openAvatarSelector = function() {
+                const optionsDiv = document.getElementById('avatar-options');
+                optionsDiv.innerHTML = '';
+                avatarOptions.forEach(avatar => {
+                    const img = document.createElement('img');
+                    img.src = avatar;
+                    img.style.width = '50px';
+                    img.style.height = '50px';
+                    img.style.borderRadius = '25px';
+                    img.style.cursor = 'pointer';
+                    img.style.border = '2px solid transparent';
+                    img.onclick = (ev) => { ev.stopPropagation(); selectAvatar(avatar); };
+                    optionsDiv.appendChild(img);
+                });
+                document.getElementById('avatar-selector-overlay').style.display = 'flex';
+                // ファイル選択イベント
+                document.getElementById('avatar-file').onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => selectAvatar(event.target.result);
+                        reader.readAsDataURL(file);
+                    }
+                };
+            }
+
+            window.closeAvatarSelector = function() {
+                document.getElementById('avatar-selector-overlay').style.display = 'none';
+            }
+
+            window.selectAvatar = function(avatar) {
+                const roomId = document.getElementById('room-id').value;
+                if (roomId && currentUserId) {
+                    set(ref(db, 'rooms/' + roomId + '/users/' + currentUserId + '/avatar'), avatar);
+                }
+                closeAvatarSelector();
+            }
+
+            window.editUserName = function(el) {
+                const avatarDiv = el?.closest('.user-avatar');
+                if (!avatarDiv) return;
+                avatarDiv.dataset.editing = 'true';
+                const nameDiv = avatarDiv.querySelector('.user-tooltip .user-name');
+                if (!nameDiv) return;
+                const currentName = nameDiv.textContent;
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = currentName;
+                input.style.width = '100%';
+                input.style.boxSizing = 'border-box';
+                input.onblur = () => {
+                    setTimeout(() => {
+                        const newName = input.value.trim();
+                        if (newName && newName !== currentName) {
+                            const roomId = document.getElementById('room-id').value;
+                            if (roomId && currentUserId) {
+                                set(ref(db, 'rooms/' + roomId + '/users/' + currentUserId + '/name'), newName);
+                            }
+                        }
+                        nameDiv.textContent = newName || currentName;
+                        avatarDiv.dataset.editing = 'false';
+                    }, 100);
+                };
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        input.blur();
+                    }
+                };
+                nameDiv.textContent = '';
+                nameDiv.appendChild(input);
+                input.focus();
+            }
+
             window.onload = function() {
                 if (localStorage.getItem('darkMode') === 'on') toggleDarkMode();
                 const savedColor = localStorage.getItem('themeColor');
@@ -448,6 +724,10 @@
                 // 常に起動時はモード選択を優先（オンライン/オフライン選択画面を最初に出す）
                 document.getElementById('mode-selector-overlay').style.display = 'flex';
                 document.getElementById('room-login-overlay').style.display = 'none';
+                // スマートフォン検知
+                if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                    document.getElementById('mobile-warning').style.display = 'block';
+                }
             };
 
             window.chooseModeAndStart = function(mode) {
@@ -460,6 +740,7 @@
             };
 
             window.toggleModeSelector = function() {
+                document.getElementById('settings-modal-overlay').style.display = 'none';
                 document.getElementById('mode-selector-overlay').style.display = 'flex';
             };
 
@@ -521,10 +802,38 @@
                         return false;
                     }
                     draggedItem = div;
+                    afterElement = null;
+                    if (!placeholder) {
+                        placeholder = document.createElement('div');
+                        placeholder.style.height = '2px';
+                        placeholder.style.background = 'rgba(0,0,0,0.3)';
+                        placeholder.style.margin = '0';
+                        placeholder.style.border = 'none';
+                    }
                     div.style.opacity = '0.4';
                 };
-                div.ondragend = () => { draggedItem = null; div.style.opacity = '1'; saveLogOrder ? saveLogOrder() : saveData(); };
-                div.ondragover = e => { e.preventDefault(); const after = getDragAfterElement(area, e.clientY, '.input-row'); if (!after) area.appendChild(div); else area.insertBefore(div, after); };
+                div.ondragover = e => { 
+                    e.preventDefault(); 
+                    afterElement = getDragAfterElement(area, e.clientY, '.input-row'); 
+                    if (placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
+                    if (!afterElement) {
+                        area.appendChild(placeholder);
+                    } else {
+                        area.insertBefore(placeholder, afterElement);
+                    }
+                };
+                div.ondrop = e => { 
+                    e.preventDefault(); 
+                    if (placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
+                    if (!afterElement) area.appendChild(draggedItem); else area.insertBefore(draggedItem, afterElement); 
+                };
+                div.ondragend = () => { 
+                    draggedItem = null; 
+                    afterElement = null; 
+                    if (placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
+                    div.style.opacity = '1'; 
+                    saveLogOrder ? saveLogOrder() : saveData(); 
+                };
                 if (afterTarget) area.insertBefore(div, afterTarget.nextSibling); else area.appendChild(div);
                 if (!skipCalculate) calculateAll(false);
             }
@@ -552,12 +861,12 @@
             }
 
             window.getDragAfterElement = function(container, y, selector) {
-                const elements = [...container.querySelectorAll(`${selector}:not([style*="opacity: 0.4"])`)];
+                const elements = [...container.querySelectorAll(selector)].filter(el => el !== draggedItem);
                 return elements.reduce((closest, child) => {
                     const box = child.getBoundingClientRect(), offset = y - box.top - box.height / 2;
                     if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
                     else return closest;
-                }, { offset: Number.NEGATIVE_INFINITY }).element;
+                }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
             }
 
             window.calculateAll = function(isSave = true) {
@@ -605,9 +914,41 @@
                         <div class="log-summary" onclick="toggleLogDetails(this)"><span>${log.time}</span><span>Total: <b>${log.total}</b> <span class="arrow">▲</span></span></div>
                         <div class="log-details">${detailText}</div>
                     `;
-                    container.ondragstart = (e) => { if(e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return e.preventDefault(); draggedLog = container; container.classList.add('dragging'); };
-                    container.ondragend = () => { draggedLog = null; container.classList.remove('dragging'); saveLogOrder(); };
-                    list.ondragover = e => { e.preventDefault(); const after = getDragAfterElement(list, e.clientY, '.log-item-container'); if (!after) list.appendChild(draggedLog); else list.insertBefore(draggedLog, after); };
+                    container.ondragstart = (e) => { 
+                        if(e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return e.preventDefault(); 
+                        draggedLog = container; 
+                        afterLogElement = null; 
+                        if (!placeholder) {
+                            placeholder = document.createElement('div');
+                            placeholder.style.height = '2px';
+                            placeholder.style.background = 'rgba(0,0,0,0.3)';
+                            placeholder.style.margin = '0';
+                            placeholder.style.border = 'none';
+                        }
+                        container.classList.add('dragging'); 
+                    };
+                    container.ondragend = () => { 
+                        draggedLog = null; 
+                        afterLogElement = null; 
+                        if (placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
+                        container.classList.remove('dragging'); 
+                        saveLogOrder(); 
+                    };
+                    list.ondragover = e => { 
+                        e.preventDefault(); 
+                        afterLogElement = getDragAfterElement(list, e.clientY, '.log-item-container'); 
+                        if (placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
+                        if (!afterLogElement) {
+                            list.appendChild(placeholder);
+                        } else {
+                            list.insertBefore(placeholder, afterLogElement);
+                        }
+                    };
+                    list.ondrop = e => { 
+                        e.preventDefault(); 
+                        if (placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
+                        if (!afterLogElement) list.appendChild(draggedLog); else list.insertBefore(draggedLog, afterLogElement); 
+                    };
                     list.appendChild(container);
                 });
             }
@@ -662,24 +1003,109 @@
                 return adjectives[Math.floor(Math.random() * adjectives.length)] + ' ' + nouns[Math.floor(Math.random() * nouns.length)];
             }
 
+            window.generateRandomAvatar = function() {
+                return avatarOptions[Math.floor(Math.random() * avatarOptions.length)];
+            }
+
             window.renderUserList = function() {
                 const userList = document.getElementById('user-list');
                 userList.innerHTML = '';
+                const userIds = Object.keys(users);
+                const maxDisplay = 4;
+                const hasMore = userIds.length > maxDisplay;
+                
+                // 最初のmaxDisplayユーザーを表示
+                userIds.slice(0, maxDisplay).forEach(userId => {
+                    addUserAvatar(userId, userList);
+                });
+
+                // 余ったユーザーがあれば「...」ボタンを追加
+                if (hasMore) {
+                    const moreBtn = document.createElement('div');
+                    moreBtn.className = 'user-more-btn';
+                    moreBtn.textContent = '...';
+                    moreBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        openUserListModal();
+                    };
+                    userList.appendChild(moreBtn);
+                }
+            }
+
+            window.addUserAvatar = function(userId, userList) {
+                const user = users[userId];
+                if (!user) return;
+                const avatarDiv = document.createElement('div');
+                avatarDiv.className = 'user-avatar' + (userId === currentUserId ? ' self' : '');
+                avatarDiv.innerHTML = `
+                    <img src="${user.avatar}" alt="${user.name}" style="width:100%; height:100%; border-radius:50%;">
+                    <div class="user-tooltip">
+                        <div class="avatar-detail">
+                            <img src="${user.avatar}" alt="${user.name}">
+                            ${userId === currentUserId ? '<div class="camera-icon" onclick="event.stopPropagation();openAvatarSelector()">📷</div>' : ''}
+                        </div>
+                        <div class="edit-name">
+                            <div class="user-name">${user.name}</div>
+                            ${userId === currentUserId ? '<div class="pencil-icon" onclick="event.stopPropagation();editUserName(this)">✏️</div>' : ''}
+                        </div>
+                    </div>
+                `;
+                let hideTimeout;
+                const tooltip = avatarDiv.querySelector('.user-tooltip');
+
+                avatarDiv.addEventListener('mouseenter', () => {
+                    clearTimeout(hideTimeout);
+                    if (tooltip) tooltip.style.display = 'block';
+                });
+
+                avatarDiv.addEventListener('mouseleave', () => {
+                    if (avatarDiv.dataset.editing === 'true') return;
+                    hideTimeout = setTimeout(() => {
+                        if (tooltip) tooltip.style.display = 'none';
+                    }, 150);
+                });
+
+                if (tooltip) {
+                    tooltip.addEventListener('mouseenter', () => {
+                        clearTimeout(hideTimeout);
+                        tooltip.style.display = 'block';
+                    });
+                    tooltip.addEventListener('mouseleave', () => {
+                        if (avatarDiv.dataset.editing === 'true') return;
+                        hideTimeout = setTimeout(() => {
+                            tooltip.style.display = 'none';
+                        }, 150);
+                    });
+                    tooltip.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                    });
+                }
+
+                userList.appendChild(avatarDiv);
+            }
+
+            window.openUserListModal = function() {
+                const content = document.getElementById('user-list-content');
+                content.innerHTML = '';
                 Object.keys(users).forEach(userId => {
                     const user = users[userId];
-                    const avatarDiv = document.createElement('div');
-                    avatarDiv.className = 'user-avatar';
-                    avatarDiv.innerHTML = `
-                        <img src="${user.avatar}" alt="${user.name}" style="width:100%; height:100%; border-radius:50%;">
-                        <div class="user-tooltip">
-                            <img src="${user.avatar}" alt="${user.name}">
-                            <div class="user-name">${user.name}</div>
-                        </div>
+                    const userItem = document.createElement('div');
+                    userItem.style.cssText = 'text-align: center; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.02); position: relative;';
+                    userItem.innerHTML = `
+                        <img src="${user.avatar}" alt="${user.name}" style="width: 60px; height: 60px; border-radius: 30px; margin-bottom: 8px; border: 2px solid ${userId === currentUserId ? '#ff0000' : 'var(--main-color)'};"/>
+                        <div style="font-weight: bold; font-size: 14px; color: var(--text-dark);">${user.name}</div>
+                        ${userId === currentUserId ? '<div style="font-size: 12px; color: #999; margin-top: 4px;"><small>(自分)</small></div>' : ''}
                     `;
-                    userList.appendChild(avatarDiv);
+                    content.appendChild(userItem);
                 });
+                document.getElementById('user-list-modal-overlay').style.display = 'flex';
+            }
+
+            window.closeUserListModal = function() {
+                document.getElementById('user-list-modal-overlay').style.display = 'none';
             }
         </script>
     </body>
 </html>
+
 
