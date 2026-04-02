@@ -261,32 +261,18 @@
                 color: var(--text-dark);
             }
 
-            .mobile-warning {
-                position: fixed;
-                bottom: 10px;
-                right: 10px;
-                background: var(--card-bg);
-                border: 1px solid var(--border-color);
-                border-radius: 8px;
-                padding: 5px 10px;
-                font-size: 12px;
-                color: var(--text-dark);
-                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                z-index: 1002;
-                display: none;
-            }
-
             @media (max-width: 768px) {
                 body { padding: 80px 0 200px; }
                 .page-title { padding: 10px 0; font-size: 16px; gap: 10px; }
                 .page-title span { font-size: 18px; }
                 .main-content { width: 98%; }
                 .input-card { padding: 15px; }
-                .input-row { flex-direction: column; gap: 5px; padding: 8px; }
-                .label-in { width: 100%; text-align: left; }
-                .num-in { width: 100%; font-size: 16px; }
-                .memo-in { width: 100%; }
-                .row-btn { width: 100%; height: 36px; font-size: 14px; }
+                .input-row { flex-direction: column; gap: 5px; padding: 8px; align-items: stretch; }
+                .label-in { width: 100%; text-align: left; order: -1; }
+                .num-in { width: 100%; font-size: 16px; order: 1; }
+                .memo-in { width: 100%; order: 2; }
+                .row-color-picker { order: 3; align-self: flex-start; }
+                .row-btn { width: 100%; height: 36px; font-size: 14px; order: 4; }
                 .btn-group { gap: 5px; }
                 .btn { padding: 8px 12px; font-size: 14px; }
                 .btn-main { padding: 12px 30px; font-size: 16px; }
@@ -304,6 +290,7 @@
                 .room-card { padding: 30px 20px; max-width: 300px; }
                 .modal-text { font-size: 16px; }
                 .modal-btn { padding: 10px 20px; font-size: 14px; }
+                .mobile-controls { display: block !important; }
             }
         </style>
     </head>
@@ -343,9 +330,8 @@
             <div class="color-picker-container">
                 <input type="color" id="colorPicker" value="#69e4f0" oninput="changeThemeColor(this.value)">
             </div>
-            <button class="btn btn-sub" onclick="openSettingsModal()">設定</button>
+            <button class="btn btn-sub" onclick="openOtherModal()">その他</button>
             <div id="user-list" class="user-list"></div>
-            <button class="btn btn-sub" onclick="openUserListModal()" title="ユーザー一覧">ユーザー一覧</button>
         </div>
 
         <div id="custom-modal-overlay">
@@ -360,10 +346,11 @@
 
         <div id="settings-modal-overlay" class="room-overlay" style="display: none;">
             <div class="room-card">
-                <h2 style="margin-top:0; color:var(--main-color); filter:brightness(0.8);">設定</h2>
+                <h2 style="margin-top:0; color:var(--main-color); filter:brightness(0.8);">その他</h2>
                 <div style="display: flex; flex-direction: column; gap: 10px; margin: 20px 0;">
                     <button class="btn btn-sub" style="width:100%; padding:12px;" onclick="toggleDarkMode()">Dark/White</button>
                     <button class="btn btn-sub" style="width:100%; padding:12px;" onclick="toggleModeSelector()">モード切替</button>
+                    <button class="btn btn-sub" id="user-list-btn" style="width:100%; padding:12px; display:none;" onclick="openUserListModal()">ユーザー一覧</button>
                 </div>
                 <div style="margin-top:20px;">
                     <button class="btn btn-main" style="width:100%; padding:12px;" onclick="closeSettingsModal()">閉じる</button>
@@ -426,10 +413,13 @@
             <div class="btn-group">
                 <button class="btn btn-main" onclick="calculateAll()">Calculation & Save Log</button>
             </div>
+            <div class="mobile-controls" style="display: none; margin-top: 10px;">
+                <button class="btn btn-sub" id="drag-mode-btn" onclick="toggleDragMode()">スクロールモード</button>
+            </div>
         </div>
 
 
-        <div class="mobile-warning" id="mobile-warning">
+        <div class="mobile-warning" id="mobile-warning" style="display: none;">
             ※このサイトはタブレットまたはパソコンで見ることを推奨しています
         </div>
 
@@ -469,10 +459,10 @@
             let saveTimeout;
             let currentUserId = null;
             let users = {};
+            let isDragMode = false; // デフォルトはスクロールモード
 
             window.debouncedSaveData = function() {
-                clearTimeout(saveTimeout);
-                saveTimeout = setTimeout(() => saveData(), 500);
+                saveData();
             }
             
             // オンライン接続と同期
@@ -510,6 +500,7 @@
                                 users = usersSnapshot.val() || {};
                                 renderUserList();
                             });
+                            document.getElementById('user-list-btn').style.display = 'block';
                         } else {
                             roomPwInput.style.borderColor = '#d00';
                             pwError.textContent = 'パスワードが違います';
@@ -558,6 +549,7 @@
                     document.getElementById('user-list').innerHTML = '';
                     users = {};
                     currentUserId = null;
+                    document.getElementById('user-list-btn').style.display = 'none';
                 }
             };
             
@@ -665,7 +657,7 @@
                 setTimeout(() => { document.getElementById('custom-modal-overlay').style.display = 'none'; }, 200);
             }
 
-            window.openSettingsModal = function() {
+            window.openOtherModal = function() {
                 document.getElementById('settings-modal-overlay').style.display = 'flex';
             }
 
@@ -756,7 +748,7 @@
                 document.getElementById('room-login-overlay').style.display = 'none';
                 // スマートフォン検知
                 if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                    document.getElementById('mobile-warning').style.display = 'block';
+                    document.querySelector('.mobile-controls').style.display = 'block';
                 }
             };
 
@@ -808,10 +800,10 @@
                 const rowColor = normalizeColor(color || (document.body.classList.contains('dark-mode') ? '#444' : '#ddd'));
                 div.style.backgroundColor = rowColor + "33";
                 div.innerHTML = `
-                    <input type="color" class="row-color-picker" value="${rowColor}" oninput="setTimeout(() => updateRowColor(this), 100)">
-                    <input type="text" class="label-in" value="${labelText}" oninput="debouncedSaveData()" style="background-color:${rowColor}33; color:${rowColor}; border-bottom:2px solid ${rowColor} !important;">
-                    <input type="number" class="num-in" value="${num}" style="border-color:${rowColor}" placeholder="0" oninput="debouncedSaveData()">
-                    <input type="text" class="memo-in" value="${memo}" style="border-color:${rowColor}" placeholder="メモ" oninput="debouncedSaveData()">
+                    <input type="color" class="row-color-picker" value="${rowColor}" onblur="debouncedSaveData()">
+                    <input type="text" class="label-in" value="${labelText}" onblur="debouncedSaveData()" style="background-color:${rowColor}33; color:${rowColor}; border-bottom:2px solid ${rowColor} !important;">
+                    <input type="number" class="num-in" value="${num}" style="border-color:${rowColor}" placeholder="0" onblur="debouncedSaveData()">
+                    <input type="text" class="memo-in" value="${memo}" style="border-color:${rowColor}" placeholder="メモ" onblur="debouncedSaveData()">
                     <button class="row-btn btn-copy" onclick="copyThisRow(this)">❐</button>
                     <button class="row-btn btn-del" onclick="removeThisRow(this)">✕</button>
                 `;
@@ -827,7 +819,7 @@
                     button.addEventListener('pointerdown', (e) => e.stopPropagation());
                 });
                 div.ondragstart = (e) => {
-                    if (e.target.closest('input') || e.target.closest('button')) {
+                    if (!isDragMode || e.target.closest('input') || e.target.closest('button')) {
                         e.preventDefault();
                         return false;
                     }
@@ -945,7 +937,7 @@
                         <div class="log-details">${detailText}</div>
                     `;
                     container.ondragstart = (e) => { 
-                        if(e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return e.preventDefault(); 
+                        if (!isDragMode || e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return e.preventDefault(); 
                         draggedLog = container; 
                         afterLogElement = null; 
                         if (!placeholder) {
@@ -1039,9 +1031,14 @@
 
             window.renderUserList = function() {
                 const userList = document.getElementById('user-list');
+                if (currentMode !== 'online') {
+                    userList.innerHTML = '';
+                    return;
+                }
                 userList.innerHTML = '';
                 const userIds = Object.keys(users);
-                const maxDisplay = 4;
+                const isMobile = window.innerWidth <= 768;
+                const maxDisplay = isMobile ? 2 : 7;
                 const hasMore = userIds.length > maxDisplay;
                 
                 // 最初のmaxDisplayユーザーを表示
